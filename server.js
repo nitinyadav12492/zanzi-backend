@@ -13,6 +13,10 @@ dotenv.config();
 connectDB();
 
 const app = express();
+app.use(cors({
+  origin: "https://your-frontend.vercel.app",
+  credentials: true
+}));
 
 // ── Middleware ────────────────────────────────────────────────
 app.use(cors({ origin: (origin, callback) => {
