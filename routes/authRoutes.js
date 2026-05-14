@@ -21,11 +21,23 @@ router.post("/test-email", async (req, res) => {
   const otp = generateOTP();
 
   try {
-    await sendVerificationEmail(email, otp);
-    res.json({ message: "Test email sent", otp });
+    const result = await sendVerificationEmail(email, otp);
+    res.json({ message: "Test email sent", otp, emailResult: result });
   } catch (err) {
     res.status(500).json({ message: "Email test failed", error: err.message });
   }
+});
+
+// Debug endpoint to check environment variables (remove in production)
+router.get("/debug", (req, res) => {
+  res.json({
+    environment: process.env.NODE_ENV,
+    emailUser: process.env.EMAIL_USER ? "SET" : "NOT SET",
+    emailPass: process.env.EMAIL_PASS ? "SET (" + process.env.EMAIL_PASS.length + " chars)" : "NOT SET",
+    mongoUri: process.env.MONGODB_URI ? "SET" : "NOT SET",
+    jwtSecret: process.env.JWT_SECRET ? "SET" : "NOT SET",
+    port: process.env.PORT
+  });
 });
 
 module.exports = router;

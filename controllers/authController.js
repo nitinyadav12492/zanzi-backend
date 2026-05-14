@@ -40,7 +40,7 @@ const signup = async (req, res) => {
     // Generate OTP and send email
     const otp = generateOTP();
     console.log(`📧 Sending OTP to ${normalizedEmail}:`, otp);
-    await sendVerificationEmail(normalizedEmail, otp);
+    const emailResult = await sendVerificationEmail(normalizedEmail, otp);
 
     // Store verification data
     console.log("💾 Storing verification data...");
@@ -56,7 +56,16 @@ const signup = async (req, res) => {
     );
 
     console.log("✅ Signup successful for:", normalizedEmail);
-    res.status(200).json({ message: "Verification code sent to your email. Please verify to complete signup." });
+
+    // Return response with OTP info if email failed
+    const response = { message: "Verification code sent to your email. Please verify to complete signup." };
+    if (!emailResult.success) {
+      response.warning = "Email delivery failed. Check server logs for the verification code.";
+      response.otp = otp; // Include OTP in response for testing
+      console.log(`⚠️ Email failed, OTP included in response: ${otp}`);
+    }
+
+    res.status(200).json(response);
   } catch (err) {
     console.error("❌ Signup error:", err.message || err);
     console.error("Stack:", err.stack);
@@ -151,7 +160,7 @@ const resendOTP = async (req, res) => {
     // Generate new OTP and send email
     const otp = generateOTP();
     console.log(`📧 Sending new OTP to ${trimmedEmail}:`, otp);
-    await sendVerificationEmail(trimmedEmail, otp);
+    const emailResult = await sendVerificationEmail(trimmedEmail, otp);
 
     // Update verification record
     verification.otp = otp;
@@ -159,7 +168,16 @@ const resendOTP = async (req, res) => {
     await verification.save();
 
     console.log("✅ OTP resent successfully for:", trimmedEmail);
-    res.status(200).json({ message: "New verification code sent to your email." });
+
+    // Return response with OTP info if email failed
+    const response = { message: "New verification code sent to your email." };
+    if (!emailResult.success) {
+      response.warning = "Email delivery failed. Check server logs for the verification code.";
+      response.otp = otp; // Include OTP in response for testing
+      console.log(`⚠️ Email failed, OTP included in response: ${otp}`);
+    }
+
+    res.status(200).json(response);
   } catch (err) {
     console.error("❌ Resend OTP error:", err.message);
     console.error("Stack:", err.stack);

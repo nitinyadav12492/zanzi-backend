@@ -30,15 +30,20 @@ const transporter = hasEmailConfig
 // Test transporter on startup
 if (transporter) {
   console.log("📧 Email transporter configured for:", emailUser);
+  console.log("📧 Email config - Host:", emailHost, "Port:", emailPort, "Secure:", emailSecure);
+
   transporter.verify((error, success) => {
     if (error) {
       console.error("❌ Email transporter verification failed:", error.message);
+      console.error("Full error:", error);
     } else {
       console.log("✅ Email transporter is ready to send emails");
     }
   });
 } else {
-  console.warn("⚠️ Email transporter not configured - OTP will only log to console");
+  console.warn("⚠️ Email transporter not configured - missing EMAIL_USER or EMAIL_PASS");
+  console.log("EMAIL_USER:", emailUser ? "SET" : "NOT SET");
+  console.log("EMAIL_PASS:", emailPass ? "SET (" + emailPass.length + " chars)" : "NOT SET");
 }
 
 const generateOTP = () => crypto.randomInt(100000, 999999).toString();
@@ -73,10 +78,11 @@ const sendVerificationEmail = async (email, otp) => {
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log(`✅ Email sent successfully to ${email}. Message ID: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
   } catch (err) {
     console.error(`❌ Email send failed for ${email}:`, err.message);
     console.error("Full error:", err);
-    // Don't throw error - just log it so signup can continue
+    return { success: false, error: err.message };
   }
 };
 
