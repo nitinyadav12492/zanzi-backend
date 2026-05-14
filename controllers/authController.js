@@ -17,34 +17,37 @@ const signup = async (req, res) => {
     if (!name || !email || !password)
       return res.status(400).json({ message: "All fields required" });
 
+    // Normalize email: lowercase and trim
+    const normalizedEmail = email.toLowerCase().trim();
+
     // Basic email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email))
+    if (!emailRegex.test(normalizedEmail))
       return res.status(400).json({ message: "Please enter a valid email address" });
 
     console.log("Checking if user exists...");
     // Check if email already exists (verified or not)
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       if (existingUser.isVerified) {
         return res.status(400).json({ message: "Email already registered" });
       } else {
         // If unverified, allow resending OTP
-        await Verification.findOneAndDelete({ email });
+        await Verification.findOneAndDelete({ email: normalizedEmail });
       }
     }
 
     // Generate OTP and send email
     const otp = generateOTP();
-    console.log(`📧 Sending OTP to ${email}:`, otp);
-    await sendVerificationEmail(email, otp);
+    console.log(`📧 Sending OTP to ${normalizedEmail}:`, otp);
+    await sendVerificationEmail(normalizedEmail, otp);
 
     // Store verification data
     console.log("💾 Storing verification data...");
     await Verification.findOneAndUpdate(
-      { email },
+      { email: normalizedEmail },
       {
-        email,
+        email: normalizedEmail,
         otp,
         userData: { name, password, phone },
         expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
@@ -52,7 +55,7 @@ const signup = async (req, res) => {
       { upsert: true, new: true }
     );
 
-    console.log("✅ Signup successful for:", email);
+    console.log("✅ Signup successful for:", normalizedEmail);
     res.status(200).json({ message: "Verification code sent to your email. Please verify to complete signup." });
   } catch (err) {
     console.error("❌ Signup error:", err.message || err);
@@ -65,32 +68,42 @@ const signup = async (req, res) => {
 const verifyEmail = async (req, res) => {
   try {
     const { email, otp } = req.body;
+    console.log("🔐 Email verification attempt for:", email);
+
     if (!email || !otp)
       return res.status(400).json({ message: "Email and OTP are required" });
 
-    const verification = await Verification.findOne({ email, otp });
-    if (!verification)
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log("🔍 Checking verification record...");
+
+    const verification = await Verification.findOne({ email: normalizedEmail, otp });
+    if (!verification) {
+      console.warn("⚠️ Invalid or expired OTP for:", normalizedEmail);
       return res.status(400).json({ message: "Invalid or expired verification code" });
+    }
 
     // Create the user
+    console.log("👤 Creating user account for:", normalizedEmail);
     const user = await User.create({
       name: verification.userData.name,
-      email: verification.email,
+      email: normalizedEmail,
       password: verification.userData.password,
       phone: verification.userData.phone,
       isVerified: true,
     });
 
     // Delete verification record
-    await Verification.findOneAndDelete({ email });
+    await Verification.findOneAndDelete({ email: normalizedEmail });
 
+    console.log("✅ Email verified successfully for:", normalizedEmail);
     res.status(201).json({
       _id: user._id, name: user.name, email: user.email,
       role: user.role, token: generateToken(user._id),
     });
   } catch (err) {
-    console.error("Verification error:", err);
-    res.status(500).json({ message: err.message });
+    console.error("❌ Verification error:", err.message);
+    console.error("Stack:", err.stack);
+    res.status(500).json({ message: `Verification failed: ${err.message}` });
   }
 };
 const login = async (req, res) => {
@@ -116,26 +129,41 @@ const login = async (req, res) => {
 const resendOTP = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email)
+    console.log("📧 Resend OTP request for:", email);
+
+    // Validate email
+    if (!email || email.trim() === "")
       return res.status(400).json({ message: "Email is required" });
 
-    const verification = await Verification.findOne({ email });
-    if (!verification)
-      return res.status(400).json({ message: "No pending verification found for this email" });
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim()))
+      return res.status(400).json({ message: "Please provide a valid email address" });
+
+    const trimmedEmail = email.toLowerCase().trim();
+    console.log("🔍 Checking verification record for:", trimmedEmail);
+
+    const verification = await Verification.findOne({ email: trimmedEmail });
+    if (!verification) {
+      console.warn("⚠️ No verification record found for:", trimmedEmail);
+      return res.status(400).json({ message: "No pending verification found. Please signup first." });
+    }
 
     // Generate new OTP and send email
     const otp = generateOTP();
-    await sendVerificationEmail(email, otp);
+    console.log(`📧 Sending new OTP to ${trimmedEmail}:`, otp);
+    await sendVerificationEmail(trimmedEmail, otp);
 
     // Update verification record
     verification.otp = otp;
     verification.expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await verification.save();
 
+    console.log("✅ OTP resent successfully for:", trimmedEmail);
     res.status(200).json({ message: "New verification code sent to your email." });
   } catch (err) {
-    console.error("Resend OTP error:", err);
-    res.status(500).json({ message: "Failed to resend verification code. Please try again." });
+    console.error("❌ Resend OTP error:", err.message);
+    console.error("Stack:", err.stack);
+    res.status(500).json({ message: `Failed to resend verification code: ${err.message}` });
   }
 };
 const getProfile = async (req, res) => {
