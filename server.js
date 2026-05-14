@@ -14,7 +14,7 @@ connectDB();
 
 const app = express();
 app.use(cors({
-  origin: "https://your-frontend.vercel.app",
+  origin: "https://cerulean-piroshki-e46083.netlify.app",
   credentials: true
 }));
 
