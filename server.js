@@ -14,19 +14,26 @@ connectDB();
 
 const app = express();
 app.use(cors({
-  
-  origin: ["http://localhost:5173",
-  "https://cerulean-piroshki-e46083.netlify.app"],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost for development
+    if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) {
+      return callback(null, true);
+    }
+    
+    // Allow production frontend
+    if (origin === "https://cerulean-piroshki-e46083.netlify.app") {
+      return callback(null, true);
+    }
+    
+    return callback(new Error("CORS policy blocked this origin"));
+  },
   credentials: true
 }));
 
 // ── Middleware ────────────────────────────────────────────────
-app.use(cors({ origin: (origin, callback) => {
-  if (!origin) return callback(null, true);
-  const isLocalhost = origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
-  if (isLocalhost) return callback(null, true);
-  return callback(new Error("CORS policy blocked this origin"));
-}, credentials: true }));
 app.use(express.json());
 
 // ── Routes ───────────────────────────────────────────────────

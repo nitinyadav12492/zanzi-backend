@@ -12,6 +12,8 @@ const generateToken = (id) =>
 const signup = async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
+    console.log("📝 Signup attempt:", { name, email, phone });
+
     if (!name || !email || !password)
       return res.status(400).json({ message: "All fields required" });
 
@@ -20,6 +22,7 @@ const signup = async (req, res) => {
     if (!emailRegex.test(email))
       return res.status(400).json({ message: "Please enter a valid email address" });
 
+    console.log("Checking if user exists...");
     // Check if email already exists (verified or not)
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -33,9 +36,11 @@ const signup = async (req, res) => {
 
     // Generate OTP and send email
     const otp = generateOTP();
+    console.log(`📧 Sending OTP to ${email}:`, otp);
     await sendVerificationEmail(email, otp);
 
     // Store verification data
+    console.log("💾 Storing verification data...");
     await Verification.findOneAndUpdate(
       { email },
       {
@@ -47,10 +52,12 @@ const signup = async (req, res) => {
       { upsert: true, new: true }
     );
 
+    console.log("✅ Signup successful for:", email);
     res.status(200).json({ message: "Verification code sent to your email. Please verify to complete signup." });
   } catch (err) {
-    console.error("Signup error:", err);
-    res.status(500).json({ message: "Email verification failed. Please try again." });
+    console.error("❌ Signup error:", err.message || err);
+    console.error("Stack:", err.stack);
+    res.status(500).json({ message: `Signup failed: ${err.message || "Unknown error"}` });
   }
 };
 
