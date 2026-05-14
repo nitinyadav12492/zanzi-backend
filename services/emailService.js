@@ -20,42 +20,63 @@ const transporter = hasEmailConfig
         pass: emailPass,
       },
       tls: {
-        rejectUnauthorized,
+        rejectUnauthorized: false, // Allow self-signed certificates for development
       },
-      logger: false,
-      debug: false,
+      logger: true,
+      debug: true,
     })
   : null;
+
+// Test transporter on startup
+if (transporter) {
+  console.log("📧 Email transporter configured for:", emailUser);
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error("❌ Email transporter verification failed:", error.message);
+    } else {
+      console.log("✅ Email transporter is ready to send emails");
+    }
+  });
+} else {
+  console.warn("⚠️ Email transporter not configured - OTP will only log to console");
+}
 
 const generateOTP = () => crypto.randomInt(100000, 999999).toString();
 
 const sendVerificationEmail = async (email, otp) => {
-  console.log(`Verification OTP for ${email}: ${otp}`); // For testing, log to console
+  console.log(`📧 Attempting to send OTP to ${email}: ${otp}`);
 
   if (!transporter) {
-    console.warn("Email transport is not configured. OTP is logged only.");
+    console.warn("⚠️ Email transport not configured. OTP logged to console only.");
     return;
   }
 
   const mailOptions = {
-    from: emailUser,
+    from: `"Zanzee Services" <${emailUser}>`,
     to: email,
     subject: "Email Verification - Zanzee",
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Welcome to Zanzee!</h2>
-        <p>Your verification code is:</p>
-        <h1 style="color: #007bff; font-size: 32px;">${otp}</h1>
-        <p>This code will expire in 10 minutes.</p>
-        <p>If you didn't request this, please ignore this email.</p>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #333; text-align: center;">Welcome to Zanzee!</h2>
+        <p style="font-size: 16px;">Your verification code is:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <span style="font-size: 32px; font-weight: bold; color: #007bff; background: #f8f9fa; padding: 10px 20px; border-radius: 5px; letter-spacing: 3px;">${otp}</span>
+        </div>
+        <p style="font-size: 14px; color: #666;">This code will expire in 10 minutes.</p>
+        <p style="font-size: 14px; color: #666;">If you didn't request this, please ignore this email.</p>
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+        <p style="font-size: 12px; color: #999; text-align: center;">Zanzee Home Services</p>
       </div>
     `,
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ Email sent successfully to ${email}. Message ID: ${info.messageId}`);
   } catch (err) {
-    console.warn("Email send failed, OTP logged to console instead:", err.message || err);
+    console.error(`❌ Email send failed for ${email}:`, err.message);
+    console.error("Full error:", err);
+    // Don't throw error - just log it so signup can continue
   }
 };
 
