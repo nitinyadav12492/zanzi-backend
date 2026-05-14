@@ -10,7 +10,13 @@ const connectDB = require("./config/db");
 dotenv.config();
 
 // Connect to MongoDB
-connectDB();
+console.log("🔄 Connecting to MongoDB...");
+connectDB().then(() => {
+  console.log("✅ MongoDB connection established");
+}).catch((err) => {
+  console.error("❌ MongoDB connection failed:", err.message);
+  process.exit(1);
+});
 
 const app = express();
 app.use(cors({
@@ -44,6 +50,13 @@ app.use("/api/cart",     require("./routes/cartRoutes"));
 
 // Health check
 app.get("/", (req, res) => res.json({ message: "🔧 Zanzee API running!" }));
+
+// Health check without DB
+app.get("/health", (req, res) => res.json({ 
+  status: "ok", 
+  timestamp: new Date().toISOString(),
+  environment: process.env.NODE_ENV || "development"
+}));
 
 // ── Start Server ─────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
