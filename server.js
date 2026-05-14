@@ -14,7 +14,9 @@ connectDB();
 
 const app = express();
 app.use(cors({
-  origin: "https://cerulean-piroshki-e46083.netlify.app",
+  
+  origin: ["http://localhost:5173",
+  "https://cerulean-piroshki-e46083.netlify.app"],
   credentials: true
 }));
 
