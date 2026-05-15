@@ -1,10 +1,12 @@
 // routes/authRoutes.js
 const express = require("express");
 const router  = express.Router();
-const { signup, login, getProfile, updateProfile, getAllUsers } = require("../controllers/authController");
+const { signup, login, verifyEmail, resendOTP, getProfile, updateProfile, getAllUsers } = require("../controllers/authController");
 const { protect, adminOnly } = require("../middleware/authMiddleware");
 
 router.post("/signup", signup);
+router.post("/verify-email", verifyEmail);
+router.post("/resend-otp", resendOTP);
 router.post("/login", login);
 router.get("/profile", protect, getProfile);
 router.put("/profile", protect, updateProfile);

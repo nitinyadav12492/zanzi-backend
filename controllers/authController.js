@@ -1,6 +1,8 @@
 // controllers/authController.js — Auth Logic
 const User = require("../models/User");
+const Verification = require("../models/Verification");
 const jwt  = require("jsonwebtoken");
+const { generateOTP, sendVerificationEmail } = require("../services/emailService");
 
 // Generate JWT
 const generateToken = (id) =>
@@ -25,20 +27,29 @@ const signup = async (req, res) => {
       return res.status(400).json({ message: "Email already registered" });
     }
 
-    const user = await User.create({
-      name,
-      email: normalizedEmail,
-      password,
-      phone,
-      isVerified: true,
-    });
+    // Generate OTP and send email
+    const otp = generateOTP();
+    console.log(`🔐 Generated OTP for ${normalizedEmail}: ${otp}`);
 
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id),
+    // Save to verification DB
+    await Verification.findOneAndUpdate(
+      { email: normalizedEmail },
+      { email: normalizedEmail, otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+      { upsert: true }
+    );
+
+    // Send email with OTP
+    try {
+      await sendVerificationEmail(normalizedEmail, otp);
+    } catch (emailErr) {
+      console.error("⚠️ Email failed, but OTP saved:", emailErr.message);
+    }
+
+    // Store signup data temporarily for later verification
+    res.status(200).json({
+      message: "Verification code sent to your email",
+      email: normalizedEmail,
+      tempData: { name, email: normalizedEmail, password, phone },
     });
   } catch (err) {
     console.error("❌ Signup error:", err.message || err);
@@ -57,6 +68,9 @@ const login = async (req, res) => {
     if (!user || !(await user.matchPassword(password)))
       return res.status(401).json({ message: "Invalid email or password" });
 
+    if (!user.isVerified)
+      return res.status(403).json({ message: "Please verify your email first" });
+
     res.json({
       _id: user._id,
       name: user.name,
@@ -64,6 +78,74 @@ const login = async (req, res) => {
       role: user.role,
       token: generateToken(user._id),
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ── POST /api/auth/verify-email ───────────────────────────────
+const verifyEmail = async (req, res) => {
+  try {
+    const { email, otp, name, password, phone } = req.body;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check OTP
+    const verification = await Verification.findOne({ email: normalizedEmail });
+    if (!verification || verification.otp !== otp) {
+      return res.status(400).json({ message: "Invalid or expired verification code" });
+    }
+
+    // Create user
+    const user = await User.create({
+      name,
+      email: normalizedEmail,
+      password,
+      phone,
+      isVerified: true,
+    });
+
+    // Delete verification record
+    await Verification.deleteOne({ email: normalizedEmail });
+
+    res.status(201).json({
+      message: "Email verified successfully",
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id),
+    });
+  } catch (err) {
+    console.error("❌ Verification error:", err.message);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ── POST /api/auth/resend-otp ────────────────────────────────
+const resendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Generate new OTP
+    const otp = generateOTP();
+    console.log(`🔐 Resent OTP for ${normalizedEmail}: ${otp}`);
+
+    // Update verification
+    await Verification.findOneAndUpdate(
+      { email: normalizedEmail },
+      { otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+      { upsert: true }
+    );
+
+    // Send email
+    try {
+      await sendVerificationEmail(normalizedEmail, otp);
+    } catch (emailErr) {
+      console.error("⚠️ Email failed:", emailErr.message);
+    }
+
+    res.json({ message: "Verification code resent to your email" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -95,4 +177,4 @@ const getAllUsers = async (req, res) => {
   res.json(users);
 };
 
-module.exports = { signup, login, getProfile, updateProfile, getAllUsers };
+module.exports = { signup, login, verifyEmail, resendOTP, getProfile, updateProfile, getAllUsers };
