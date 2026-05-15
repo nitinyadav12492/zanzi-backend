@@ -96,23 +96,39 @@ const emailPass = process.env.EMAIL_PASS;
 
 const hasEmailConfig = Boolean(emailUser && emailPass);
 
+// const transporter = hasEmailConfig
+//   ? nodemailer.createTransport({
+//       host: "smtp.gmail.com",
+//       port: 465,
+//       secure: true,
+
+//       auth: {
+//         user: emailUser,
+//         pass: emailPass,
+//       },
+
+//       connectionTimeout: 30000,
+//       greetingTimeout: 30000,
+//       socketTimeout: 30000,
+//     })
+//   : null;
 const transporter = hasEmailConfig
   ? nodemailer.createTransport({
       host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
+      port: 587,
+      secure: false,
+      requireTLS: true,
 
       auth: {
         user: emailUser,
         pass: emailPass,
       },
 
-      connectionTimeout: 30000,
-      greetingTimeout: 30000,
-      socketTimeout: 30000,
+      connectionTimeout: 60000,
+      greetingTimeout: 60000,
+      socketTimeout: 60000,
     })
   : null;
-
 // Verify transporter
 if (transporter) {
   console.log("📧 Email transporter configured for:", emailUser);
