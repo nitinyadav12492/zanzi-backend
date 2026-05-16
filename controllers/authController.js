@@ -78,11 +78,20 @@ const signup = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const normalizedEmail = email.toLowerCase().trim();
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email or username and password are required" });
+    }
 
-    const user = await User.findOne({ email: normalizedEmail });
+    const normalizedInput = email.toLowerCase().trim();
+    const user = await User.findOne({
+      $or: [
+        { email: normalizedInput },
+        { name: { $regex: new RegExp(`^${normalizedInput.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } },
+      ],
+    });
+
     if (!user || !(await user.matchPassword(password)))
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ message: "Invalid email/username or password" });
 
     if (!user.isVerified)
       return res.status(403).json({ message: "Please verify your email first" });
