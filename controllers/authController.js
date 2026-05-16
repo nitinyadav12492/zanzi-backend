@@ -2,7 +2,6 @@
 const User = require("../models/User");
 const Verification = require("../models/Verification");
 const jwt  = require("jsonwebtoken");
-const { generateOTP, sendVerificationEmail } = require("../services/emailService");
 
 // Generate JWT
 const generateToken = (id) =>
@@ -34,38 +33,24 @@ const signup = async (req, res) => {
         email: normalizedEmail,
         password,
         phone,
-        isVerified: false,
+        isVerified: true,
       });
     } else {
       existingUser.name = name;
       existingUser.password = password;
       existingUser.phone = phone;
+      existingUser.isVerified = true;
       await existingUser.save();
     }
 
-    // Generate OTP and send email
-    const otp = generateOTP();
-    console.log(`🔐 Generated OTP for ${normalizedEmail}: ${otp}`);
-
-    // Save to verification DB
-    await Verification.findOneAndUpdate(
-      { email: normalizedEmail },
-      { email: normalizedEmail, otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
-      { upsert: true }
-    );
-
-    // Send email with OTP
-    try {
-      await sendVerificationEmail(normalizedEmail, otp);
-    } catch (emailErr) {
-      console.error("⚠️ Email failed, but OTP saved:", emailErr.message);
-    }
-
-    // Store signup data temporarily for later verification
-    res.status(200).json({
-      message: "Verification code sent to your email",
-      email: normalizedEmail,
-      tempData: { name, email: normalizedEmail, password, phone },
+    // Return user data so frontend can auto-login
+    res.status(201).json({
+      message: "Account created successfully",
+      _id: existingUser._id,
+      name: existingUser.name,
+      email: existingUser.email,
+      role: existingUser.role,
+      token: generateToken(existingUser._id),
     });
   } catch (err) {
     console.error("❌ Signup error:", err.message || err);
@@ -83,6 +68,8 @@ const login = async (req, res) => {
     }
 
     const normalizedInput = email.toLowerCase().trim();
+    console.log("🔍 Login attempt for:", normalizedInput);
+
     const user = await User.findOne({
       $or: [
         { email: normalizedInput },
@@ -90,12 +77,18 @@ const login = async (req, res) => {
       ],
     });
 
-    if (!user || !(await user.matchPassword(password)))
+    console.log("📋 User found:", !!user, user?.email);
+    if (!user) {
       return res.status(401).json({ message: "Invalid email/username or password" });
+    }
 
-    if (!user.isVerified)
-      return res.status(403).json({ message: "Please verify your email first" });
+    const passwordMatch = await user.matchPassword(password);
+    console.log("🔑 Password match:", passwordMatch);
+    if (!passwordMatch) {
+      return res.status(401).json({ message: "Invalid email/username or password" });
+    }
 
+    // Account verified — auto-login
     res.json({
       _id: user._id,
       name: user.name,
@@ -104,85 +97,21 @@ const login = async (req, res) => {
       token: generateToken(user._id),
     });
   } catch (err) {
+    console.error("❌ Login error:", err.message);
     res.status(500).json({ message: err.message });
   }
 };
 
 // ── POST /api/auth/verify-email ───────────────────────────────
 const verifyEmail = async (req, res) => {
-  try {
-    const { email, otp, name, password, phone } = req.body;
-    const normalizedEmail = email.toLowerCase().trim();
-
-    // Check OTP
-    const verification = await Verification.findOne({ email: normalizedEmail });
-    if (!verification || verification.otp !== otp) {
-      return res.status(400).json({ message: "Invalid or expired verification code" });
-    }
-
-    // Confirm existing user or create a new one
-    let user = await User.findOne({ email: normalizedEmail });
-    if (user) {
-      user.isVerified = true;
-      user.name = name || user.name;
-      user.phone = phone || user.phone;
-      if (password) user.password = password;
-      await user.save();
-    } else {
-      user = await User.create({
-        name,
-        email: normalizedEmail,
-        password,
-        phone,
-        isVerified: true,
-      });
-    }
-
-    // Delete verification record
-    await Verification.deleteOne({ email: normalizedEmail });
-
-    res.status(201).json({
-      message: "Email verified successfully",
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id),
-    });
-  } catch (err) {
-    console.error("❌ Verification error:", err.message);
-    res.status(500).json({ message: err.message });
-  }
+  // Email verification is disabled — users auto-verify on signup
+  res.status(410).json({ message: "Email verification is disabled" });
 };
 
 // ── POST /api/auth/resend-otp ────────────────────────────────
 const resendOTP = async (req, res) => {
-  try {
-    const { email } = req.body;
-    const normalizedEmail = email.toLowerCase().trim();
-
-    // Generate new OTP
-    const otp = generateOTP();
-    console.log(`🔐 Resent OTP for ${normalizedEmail}: ${otp}`);
-
-    // Update verification
-    await Verification.findOneAndUpdate(
-      { email: normalizedEmail },
-      { otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
-      { upsert: true }
-    );
-
-    // Send email
-    try {
-      await sendVerificationEmail(normalizedEmail, otp);
-    } catch (emailErr) {
-      console.error("⚠️ Email failed:", emailErr.message);
-    }
-
-    res.json({ message: "Verification code resent to your email" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+  // OTP system is disabled — users auto-verify on signup
+  res.status(410).json({ message: "OTP system is disabled" });
 };
 
 const getProfile = async (req, res) => {
