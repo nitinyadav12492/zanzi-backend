@@ -22,9 +22,25 @@ const signup = async (req, res) => {
     if (!emailRegex.test(normalizedEmail))
       return res.status(400).json({ message: "Please enter a valid email address" });
 
-    const existingUser = await User.findOne({ email: normalizedEmail });
-    if (existingUser) {
+    let existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser?.isVerified) {
       return res.status(400).json({ message: "Email already registered" });
+    }
+
+    // If the user has already started signup but not verified yet, update their draft record.
+    if (!existingUser) {
+      existingUser = await User.create({
+        name,
+        email: normalizedEmail,
+        password,
+        phone,
+        isVerified: false,
+      });
+    } else {
+      existingUser.name = name;
+      existingUser.password = password;
+      existingUser.phone = phone;
+      await existingUser.save();
     }
 
     // Generate OTP and send email
@@ -95,14 +111,23 @@ const verifyEmail = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired verification code" });
     }
 
-    // Create user
-    const user = await User.create({
-      name,
-      email: normalizedEmail,
-      password,
-      phone,
-      isVerified: true,
-    });
+    // Confirm existing user or create a new one
+    let user = await User.findOne({ email: normalizedEmail });
+    if (user) {
+      user.isVerified = true;
+      user.name = name || user.name;
+      user.phone = phone || user.phone;
+      if (password) user.password = password;
+      await user.save();
+    } else {
+      user = await User.create({
+        name,
+        email: normalizedEmail,
+        password,
+        phone,
+        isVerified: true,
+      });
+    }
 
     // Delete verification record
     await Verification.deleteOne({ email: normalizedEmail });
