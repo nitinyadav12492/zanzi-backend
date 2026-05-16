@@ -19,24 +19,29 @@ connectDB().then(() => {
 });
 
 const app = express();
+const allowedOrigins = [
+  "https://cerulean-piroshki-e46083.netlify.app",
+  "https://jocular-marigold-d2bb25.netlify.app",
+];
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     // Allow localhost for development
     if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) {
       return callback(null, true);
     }
-    
-    // Allow production frontend
-    if (origin === "https://cerulean-piroshki-e46083.netlify.app") {
+
+    // Allow configured production frontends
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    
+
     return callback(new Error("CORS policy blocked this origin"));
   },
-  credentials: true
+  credentials: true,
 }));
 
 // ── Middleware ────────────────────────────────────────────────
