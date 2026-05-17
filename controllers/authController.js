@@ -1,6 +1,5 @@
 // controllers/authController.js — Auth Logic
 const User = require("../models/User");
-const Verification = require("../models/Verification");
 const jwt  = require("jsonwebtoken");
 
 // Generate JWT
@@ -22,35 +21,25 @@ const signup = async (req, res) => {
       return res.status(400).json({ message: "Please enter a valid email address" });
 
     let existingUser = await User.findOne({ email: normalizedEmail });
-    if (existingUser?.isVerified) {
+    if (existingUser) {
       return res.status(400).json({ message: "Email already registered" });
     }
 
-    // If the user has already started signup but not verified yet, update their draft record.
-    if (!existingUser) {
-      existingUser = await User.create({
-        name,
-        email: normalizedEmail,
-        password,
-        phone,
-        isVerified: true,
-      });
-    } else {
-      existingUser.name = name;
-      existingUser.password = password;
-      existingUser.phone = phone;
-      existingUser.isVerified = true;
-      await existingUser.save();
-    }
+    const newUser = await User.create({
+      name,
+      email: normalizedEmail,
+      password,
+      phone,
+    });
 
     // Return user data so frontend can auto-login
     res.status(201).json({
       message: "Account created successfully",
-      _id: existingUser._id,
-      name: existingUser.name,
-      email: existingUser.email,
-      role: existingUser.role,
-      token: generateToken(existingUser._id),
+      _id: newUser._id,
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      token: generateToken(newUser._id),
     });
   } catch (err) {
     console.error("❌ Signup error:", err.message || err);
@@ -88,7 +77,8 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email/username or password" });
     }
 
-    // Account verified — auto-login
+    // previously required email verification; no longer enforced
+
     res.json({
       _id: user._id,
       name: user.name,
@@ -102,17 +92,7 @@ const login = async (req, res) => {
   }
 };
 
-// ── POST /api/auth/verify-email ───────────────────────────────
-const verifyEmail = async (req, res) => {
-  // Email verification is disabled — users auto-verify on signup
-  res.status(410).json({ message: "Email verification is disabled" });
-};
-
-// ── POST /api/auth/resend-otp ────────────────────────────────
-const resendOTP = async (req, res) => {
-  // OTP system is disabled — users auto-verify on signup
-  res.status(410).json({ message: "OTP system is disabled" });
-};
+// verification endpoints removed — signup now creates and returns a token
 
 const getProfile = async (req, res) => {
   const user = await User.findById(req.user._id).select("-password");
@@ -140,4 +120,4 @@ const getAllUsers = async (req, res) => {
   res.json(users);
 };
 
-module.exports = { signup, login, verifyEmail, resendOTP, getProfile, updateProfile, getAllUsers };
+module.exports = { signup, login, getProfile, updateProfile, getAllUsers };
