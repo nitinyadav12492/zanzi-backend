@@ -20,6 +20,7 @@ const app = express();
 const allowedOrigins = [
   "https://zanzi.onrender.com",
   "https://zan-zi-frri.vercel.app",
+  "https://zan-zi-green.vercel.app",
   "https://cerulean-piroshki-e46083.netlify.app",
   "https://jocular-marigold-d2bb25.netlify.app",
 ];
