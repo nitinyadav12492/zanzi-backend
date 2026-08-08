@@ -1,20 +1,18 @@
-// ============================================================
-// server.js — Zanzee Backend Entry Point
-// ============================================================
+
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
 
-// Load env variables
-dotenv.config();
+// Load env variables and override any existing system env values in development
+dotenv.config({ override: true });
 
 // Connect to MongoDB
-console.log("🔄 Connecting to MongoDB...");
+console.log("Connecting to MongoDB...");
 connectDB().then(() => {
-  console.log("✅ MongoDB connection established");
+  console.log("MongoDB connection established");
 }).catch((err) => {
-  console.error("❌ MongoDB connection failed:", err.message);
+  console.error("MongoDB connection failed:", err.message);
   process.exit(1);
 });
 
