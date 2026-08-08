@@ -25,7 +25,7 @@ const allowedOrigins = [
   "https://jocular-marigold-d2bb25.netlify.app",
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
@@ -43,7 +43,14 @@ app.use(cors({
     return callback(new Error("CORS policy blocked this origin"));
   },
   credentials: true,
-}));
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+  exposedHeaders: ["Content-Type", "Authorization"],
+  preflightContinue: false,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // ── Middleware ────────────────────────────────────────────────
 app.use(express.json());
